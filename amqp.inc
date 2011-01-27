@@ -1233,7 +1233,8 @@ class AMQPChannel extends AbstractChannel
         $args->write_bit($nowait);
         $this->send_method_frame(array(60, 30), $args);
         return $this->wait(array(
-                               "60,31"    // Channel.basic_cancel_ok
+                               "60,60",    // Channel.basic_deliver - timing issue
+                               "60,31"     // Channel.basic_cancel_ok
                            ));
     }
 
