@@ -816,6 +816,8 @@ class AMQPChannel extends AbstractChannel
         "90,31" => "tx_rollback_ok"
     );
     
+    protected $defaultCallback = null;
+    
     public function __construct($connection,
                                 $channel_id=NULL,
                                 $auto_decode=true)
@@ -837,6 +839,10 @@ class AMQPChannel extends AbstractChannel
         $this->alerts = array();
         $this->callbacks = array();
         $this->auto_decode = $auto_decode;
+        $this->defaultCallback = array('AMQPBehavior', 'ignoreMessage');
+        if ($this->debug) {
+            $this->defaultCallback = array('AMQPBehavior', 'debugMessage');
+        }
 
         $this->x_open();
     }
@@ -1225,17 +1231,28 @@ class AMQPChannel extends AbstractChannel
 
     /**
      * end a queue consumer
+     *
+     * @param string $consumer_tag
+     * @param boolean $nowait
+     * @param callback $cancellingBehavior - defaults to use the consumer callback
+     * @return null
      */
-    public function  basic_cancel($consumer_tag, $nowait=false)
+    public function  basic_cancel($consumer_tag, $nowait=false, $cancellingBehavior = null)
     {
         $args = new AMQPWriter();
         $args->write_shortstr($consumer_tag);
         $args->write_bit($nowait);
         $this->send_method_frame(array(60, 30), $args);
-        return $this->wait(array(
-                               "60,60",    // Channel.basic_deliver - timing issue
-                               "60,31"     // Channel.basic_cancel_ok
-                           ));
+        if ($cancellingBehavior !== null) {
+            $this->callbacks[$consumer_tag] = $cancellingBehavior;
+        }
+        if (!$nowait) {
+            return $this->wait(array(
+                                   "60,60",    // Channel.basic_deliver
+                                   "60,31"     // Channel.basic_cancel_ok
+                               ));
+        }
+        return null;
     }
 
     /**
@@ -1307,7 +1324,7 @@ class AMQPChannel extends AbstractChannel
         if(array_key_exists($consumer_tag, $this->callbacks))
             $func = $this->callbacks[$consumer_tag];
         else
-            $func = NULL;
+            $func = $this->defaultCallback;
         
         if($func!=NULL)
             call_user_func($func, $msg);
@@ -1494,7 +1511,16 @@ class AMQPChannel extends AbstractChannel
     protected function tx_select_ok($args)
     {
     }
-
+    
+    /**
+     * Set the default callback to use, if there is no matching consumer
+     *
+     * @param callback $defaultCallBack
+     */
+    public function setDefaultCallback($defaultCallBack)
+    {
+        $this->defaultCallback = $defaultCallBack;
+    }
 }
 
 /**
@@ -1527,4 +1553,53 @@ class AMQPMessage extends GenericContent
     }
 }
 
+/**
+ * A static class to use with the default callbacks of a channel
+ *
+ */
+class AMQPBehavior {
+    /**
+     * Reject a message
+     * @param AMQPMessage $msg
+     * @param boolean $requeue defaults to true
+     */
+    public static function rejectMessage($msg, $requeue = true)
+    {
+        $deliveryTag = $msg->delivery_info['delivery_tag'];
+        $channel = $msg->delivery_info['channel'];
+        $channel->basic_reject($deliveryTag, $requeue);
+    }
+
+    /**
+     * Drop and Reject a message
+     * @param AMQPMessage $msg
+     */
+    public static function dropMessage($msg)
+    {
+        self::rejectMessage($msg, false);
+    }
+
+    /**
+     * Ignore a message
+     * @param AMQPMessage $msg
+     */
+    public static function ignoreMessage($msg)
+    {
+        // no-op
+    }
+    
+    /**
+     * send message to debugging messaging
+     * @param AMQPMessage $msg
+     */
+    public static function debugMessage($msg)
+    {
+        $deliveryTag = $msg->delivery_info['delivery_tag'];
+        $consumerTag = $msg->delivery_info['consumer_tag'];
+        $channel = $msg->delivery_info['channel'];
+        $channel_id = $channel->getChannelId();
+        
+        debug_msg("Message {$deliveryTag} on channel_id {$channel_id} with consumer-tag {$consumerTag}");
+    }
+}
 ?>
