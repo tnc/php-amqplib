@@ -398,7 +398,7 @@ class AMQPConnection extends AbstractChannel
 
             $errstr = $errno = NULL;
             $this->sock = NULL;
-            if (!($this->sock = fsockopen($host,$port,$errno,$errstr,$connection_timeout)))
+            if (!($this->sock = @fsockopen($host,$port,$errno,$errstr,$connection_timeout)))
             {
                 throw new Exception ("Error Connecting to server($errno): $errstr ");
             }
