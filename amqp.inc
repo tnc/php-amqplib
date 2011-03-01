@@ -433,6 +433,12 @@ class AMQPConnection extends AbstractChannel
             @fclose($this->sock); $this->sock=NULL;
         }
     }
+
+    public function __wakeup()
+    {
+        unset($this->input);
+        unset($this->sock);
+    }
    
     public function __destruct()
     {
