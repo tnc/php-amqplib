@@ -1282,7 +1282,7 @@ class AMQPChannel extends AbstractChannel
             $this->callbacks[$consumer_tag] = $cancellingBehavior;
         }
         if (!$nowait) {
-            // Unsure we have a callback set
+            // ensure we have a callback set
             if (!isset($this->callbacks[$consumer_tag])) {
                 $this->callbacks[$consumer_tag] = $this->defaultCallback;
             }
