@@ -1282,10 +1282,18 @@ class AMQPChannel extends AbstractChannel
             $this->callbacks[$consumer_tag] = $cancellingBehavior;
         }
         if (!$nowait) {
-            return $this->wait(array(
-                                   "60,60",    // Channel.basic_deliver
-                                   "60,31"     // Channel.basic_cancel_ok
-                               ));
+            // Unsure we have a callback set
+            if (!isset($this->callbacks[$consumer_tag])) {
+                $this->callbacks[$consumer_tag] = $this->defaultCallback;
+            }
+
+            // Wait for a cancel message before actually breaking out of the waiting loop.
+            while (array_key_exists($consumer_tag, $this->callbacks)) {
+                $this->wait(array(
+                               "60,60",    // Channel.basic_deliver
+                               "60,31"     // Channel.basic_cancel_ok
+                           ));
+            }
         }
         return null;
     }
