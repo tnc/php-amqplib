@@ -7,16 +7,16 @@
    *
    */
 
-if ((int)ini_get('mbstring.func_overload') >= 2)
+if ((int)ini_get('mbstring.func_overload') & 2)
 {
     function sb_strlen($str)
     {
-        return mb_strlen($str, 'pass');
+        return mb_strlen($str, 'ASCII');
     }
 
     function sb_substr($str, $start, $length)
     {
-        return mb_substr($str, $start, $length, 'pass');
+        return mb_substr($str, $start, $length, 'ASCII');
     }
 }
 else
