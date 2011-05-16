@@ -184,9 +184,9 @@ class AMQPWriter
     public function write_shortstr($s)
     {
         $this->flushbits();
-        if(strlen($s) > 255)
+        if(sb_strlen($s) > 255)
             throw new Exception('String too long');
-        $this->write_octet(strlen($s));
+        $this->write_octet(sb_strlen($s));
         $this->out .= $s;
     }
 
@@ -197,7 +197,7 @@ class AMQPWriter
     public function write_longstr($s)
     {
         $this->flushbits();
-        $this->write_long(strlen($s));
+        $this->write_long(sb_strlen($s));
         $this->out .= $s;
     }
 
@@ -247,7 +247,7 @@ class AMQPWriter
             }
         }
         $table_data = $table_data->getvalue();
-        $this->write_long(strlen($table_data));
+        $this->write_long(sb_strlen($table_data));
         $this->write($table_data);
     }
 }
@@ -309,21 +309,21 @@ class AMQPReader
                 else
                     $start = time();                
                     
-                $read += strlen($buf);
+                $read += sb_strlen($buf);
                 $res .= $buf;
             }
 
-            if(strlen($res)!=$n)
+            if(sb_strlen($res)!=$n)
                 throw new Exception ("Error reading data. Recevived " .
-                                     strlen($res) . " instead of expected $n bytes");
+                                     sb_strlen($res) . " instead of expected $n bytes");
             $this->offset += $n;
         } else
         {
-            if(strlen($this->str) < $n)
+            if(sb_strlen($this->str) < $n)
                 throw new Exception ("Error reading data. Requested $n bytes while string buffer has only " .
-                                     strlen($this->str));
-            $res = substr($this->str,0,$n);
-            $this->str = substr($this->str,$n);
+                                     sb_strlen($this->str));
+            $res = sb_substr($this->str,0,$n);
+            $this->str = sb_substr($this->str,$n, sb_strlen($this->str));
             $this->offset += $n;
         }
         return $res;

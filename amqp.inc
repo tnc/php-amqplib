@@ -7,6 +7,31 @@
    *
    */
 
+if ((int)ini_get('mbstring.func_overload') & 2)
+{
+    function sb_strlen($str)
+    {
+        return mb_strlen($str, 'ASCII');
+    }
+
+    function sb_substr($str, $start, $length)
+    {
+        return mb_substr($str, $start, $length, 'ASCII');
+    }
+}
+else
+{
+    function sb_strlen($str)
+    {
+        return strlen($str);
+    }
+
+    function sb_substr($str, $start, $length)
+    {
+        return substr($str, $start, $length);
+    }
+}
+
 require_once('amqp_wire.inc');
 require_once('hexdump.inc');
 
@@ -22,7 +47,7 @@ function methodSig($a)
     else
         return sprintf("%d,%d",$a[0] ,$a[1]);
 }
-    
+
 
 class AMQPException extends Exception
 {
@@ -191,13 +216,13 @@ class AbstractChannel
         if($frame_type != 2)
             throw new Exception("Expecting Content header");
 
-        $payload_reader = new AMQPReader(substr($payload,0,12));
+        $payload_reader = new AMQPReader(sb_substr($payload, 0, 12));
         $class_id = $payload_reader->read_short();
         $weight = $payload_reader->read_short();
 
         $body_size = $payload_reader->read_longlong();
         $msg = new AMQPMessage();
-        $msg->load_properties(substr($payload,12));
+        $msg->load_properties(sb_substr($payload,12, sb_strlen($payload)));
 
         $body_parts = array();
         $body_received = 0;
@@ -209,7 +234,7 @@ class AbstractChannel
             if($frame_type != 3)
                 throw new Exception("Expecting Content body, received frame type $frame_type");
             $body_parts[] = $payload;
-            $body_received = bcadd($body_received, strlen($payload));
+            $body_received = bcadd($body_received, sb_strlen($payload));
         }
 
         $msg->body = implode("",$body_parts);
@@ -286,12 +311,12 @@ class AbstractChannel
             if($frame_type != 1)
                 throw new Exception("Expecting AMQP method, received frame type: $frame_type");
 
-            if(strlen($payload) < 4)
+            if(sb_strlen($payload) < 4)
                 throw new Exception("Method frame too short");
             
-            $method_sig_array = unpack("n2", substr($payload,0,4));
+            $method_sig_array = unpack("n2", sb_substr($payload,0,4));
             $method_sig = "" . $method_sig_array[1] . "," . $method_sig_array[2];
-            $args = new AMQPReader(substr($payload,4));
+            $args = new AMQPReader(sb_substr($payload,4, sb_strlen($payload)));
 
             if($this->debug)
             {
@@ -356,7 +381,7 @@ class AMQPConnection extends AbstractChannel
             $login_response = new AMQPWriter();
             $login_response->write_table(array("LOGIN" => array('S',$user),
                                                "PASSWORD" => array('S',$password)));
-            $login_response = substr($login_response->getvalue(),4); //Skip the length
+            $login_response = sb_substr($login_response->getvalue(),4, sb_strlen($login_response->getvalue())); //Skip the length
         } else
             $login_response = NULL;
         
@@ -373,7 +398,7 @@ class AMQPConnection extends AbstractChannel
 
             $errstr = $errno = NULL;
             $this->sock = NULL;
-            if (!($this->sock = fsockopen($host,$port,$errno,$errstr,$connection_timeout)))
+            if (!($this->sock = @fsockopen($host,$port,$errno,$errstr,$connection_timeout)))
             {
                 throw new Exception ("Error Connecting to server($errno): $errstr ");
             }
@@ -408,6 +433,12 @@ class AMQPConnection extends AbstractChannel
             @fclose($this->sock); $this->sock=NULL;
         }
     }
+
+    public function __wakeup()
+    {
+        unset($this->input);
+        unset($this->sock);
+    }
    
     public function __destruct()
     {
@@ -433,7 +464,7 @@ class AMQPConnection extends AbstractChannel
           debug_msg("< [hex]:\n" . hexdump($data, $htmloutput = false, $uppercase = true, $return = true));
         }
         
-        $len = strlen($data);
+        $len = sb_strlen($data);
         while(true)
         {
             if(false === ($written = fwrite($this->sock, $data)))
@@ -442,7 +473,7 @@ class AMQPConnection extends AbstractChannel
             }
             $len = $len - $written;
             if($len>0)
-                $data=substr($data,0-$len);
+                $data=sb_substr($data,0-$len, sb_strlen($data));
             else
                 break;
         }
@@ -484,7 +515,7 @@ class AMQPConnection extends AbstractChannel
 
         $pkt->write_octet(2);
         $pkt->write_short($channel);
-        $pkt->write_long(strlen($packed_properties)+12);
+        $pkt->write_long(sb_strlen($packed_properties)+12);
 
         $pkt->write_short($class_id);
         $pkt->write_short($weight);
@@ -497,13 +528,13 @@ class AMQPConnection extends AbstractChannel
         
         while($body)
         {
-            $payload = substr($body,0, $this->frame_max-8);
-            $body = substr($body,$this->frame_max-8);
+            $payload = sb_substr($body,0, $this->frame_max-8);
+            $body = sb_substr($body,$this->frame_max-8, sb_strlen($body));
             $pkt = new AMQPWriter();
 
             $pkt->write_octet(3);
             $pkt->write_short($channel);
-            $pkt->write_long(strlen($payload));
+            $pkt->write_long(sb_strlen($payload));
             
             $pkt->write($payload);
             
@@ -522,7 +553,7 @@ class AMQPConnection extends AbstractChannel
 
         $pkt->write_octet(1);
         $pkt->write_short($channel);
-        $pkt->write_long(strlen($args)+4);  // 4 = length of class_id and method_id
+        $pkt->write_long(sb_strlen($args)+4);  // 4 = length of class_id and method_id
         // in payload
 
         $pkt->write_short($method_sig[0]); // class_id
@@ -1415,7 +1446,7 @@ class AMQPChannel extends AbstractChannel
         $this->send_method_frame(array(60, 40), $args);
         
         $this->connection->send_content($this->channel_id, 60, 0,
-                                        strlen($msg->body),
+                                        sb_strlen($msg->body),
                                         $msg->serialize_properties(),
                                         $msg->body);
     }
