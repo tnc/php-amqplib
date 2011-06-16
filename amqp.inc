@@ -457,15 +457,22 @@ class AMQPConnection extends AbstractChannel
                 $this->input = NULL;
             }
         
-        if($this->sock)
+        if(gettype($this->sock) == 'resource')
         {
             if($this->debug)
             {
-              debug_msg("closing socket");
+                debug_msg("closing socket");
             }
             
             @fclose($this->sock);
             $this->sock = NULL;
+        }
+        else
+        {
+            if($this->debug)
+            {
+                debug_msg("socket is already closed");
+            }
         }
     }
 
