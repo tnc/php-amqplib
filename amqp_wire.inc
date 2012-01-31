@@ -305,8 +305,10 @@ class AMQPReader
                 $end = microtime(true);
                 if ($buf == '')
                 {
-                    if($end - $start > $this->buffer_read_timeout)
+                    if($end - $start > $this->buffer_read_timeout) {
+                        $this->sock->close();
                         throw new Exception("Timed out waiting for a response");
+                    }
                     usleep(100);
                 }
                 else
