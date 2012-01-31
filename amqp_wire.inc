@@ -254,7 +254,7 @@ class AMQPWriter
 
 class AMQPReader
 {
-    public function __construct($str, $sock=NULL)
+    public function __construct($str, $sock=NULL, $buffered_read_timeout = 5)
     {
         $this->str = $str;
         if ($sock !== NULL)
@@ -276,7 +276,7 @@ class AMQPReader
         if(!function_exists("bcmul"))
             throw new Exception("'bc math' module required");
             
-        $this->buffer_read_timeout = 5; // in seconds
+        $this->buffer_read_timeout = $buffered_read_timeout; // in seconds
     }
 
     public function close()
@@ -297,18 +297,23 @@ class AMQPReader
         {
             $res = '';
             $read = 0;
-            
-            $start = time();
+
+            $start = microtime(true);
             while($read < $n && !feof($this->sock->real_sock()) &&
                   (false !== ($buf = fread($this->sock->real_sock(), $n - $read))))
             {
+                $end = microtime(true);
                 if ($buf == '')
                 {
+                    if($end - $start > $this->buffer_read_timeout) {
+                        $this->sock->close();
+                        throw new Exception("Timed out waiting for a response");
+                    }
                     usleep(100);
                 }
                 else
-                    $start = time();                
-                    
+                    $start = $end;
+
                 $read += sb_strlen($buf);
                 $res .= $buf;
             }

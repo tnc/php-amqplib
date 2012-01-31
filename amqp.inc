@@ -373,7 +373,9 @@ class AMQPConnection extends AbstractChannel
                                 $login_response=NULL,
                                 $locale="en_US",
                                 $connection_timeout = 3,
-                                $read_write_timeout = 3)
+                                $read_write_timeout = 3,
+                                $buffered_read_timeout = 5 //fractions of a second are allowed, e.g. '1.5'
+                            )
     {
 
         if($user && $password)
@@ -405,7 +407,7 @@ class AMQPConnection extends AbstractChannel
             
             stream_set_timeout($this->sock, $read_write_timeout);
             stream_set_blocking($this->sock, 1);
-            $this->input = new AMQPReader(null, $this->sock);
+            $this->input = new AMQPReader(null, $this->sock, $buffered_read_timeout);
 
             $this->write(AMQPConnection::$AMQP_PROTOCOL_HEADER);
             $this->wait(array("10,10"));
