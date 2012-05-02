@@ -302,6 +302,10 @@ class AMQPReader
             while($read < $n && !feof($this->sock->real_sock()) &&
                   (false !== ($buf = fread($this->sock->real_sock(), $n - $read))))
             {
+                if (function_exists('pcntl_signal_dispatch')) {
+                    pcntl_signal_dispatch();
+                }
+
                 if ($buf == '')
                 {
                     usleep(100);
